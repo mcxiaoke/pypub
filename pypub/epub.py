@@ -258,23 +258,24 @@ class Epub(object):
                 raise TypeError('epub_name must be string or None')
             if epub_name is None:
                 epub_name = self.title
-            epub_name = ''.join([c for c in epub_name if c.isalpha() or c.isdigit() or c == ' ']).rstrip()
             epub_name_with_path = os.path.join(output_directory, epub_name)
-            try:
-                os.remove(os.path.join(epub_name_with_path, '.zip'))
-            except OSError:
-                pass
+            epub_name_with_path_ext = os.path.join(output_directory, '%s.zip' % epub_name)
+            print('aaaa',epub_name_with_path)
+            if os.path.exists(epub_name_with_path_ext):
+                os.remove(epub_name_with_path_ext)
             shutil.make_archive(epub_name_with_path, 'zip', self.EPUB_DIR)
-            return epub_name_with_path + '.zip'
+            return epub_name_with_path_ext
 
-        def turn_zip_into_epub(zip_archive):
-            epub_full_name = zip_archive.strip('.zip') + '.epub'
-            try:
+        def turn_zip_into_epub(zip_archive_file):
+            dir_name = os.path.dirname(zip_archive_file)
+            file_name = os.path.basename(zip_archive_file)
+            base, ext = os.path.splitext(file_name)
+            epub_full_name = os.path.join(dir_name, '%s.epub' % base)
+            print('bbbb',zip_archive_file)
+            print('cccc',epub_full_name)
+            if os.path.exists(epub_full_name):
                 os.remove(epub_full_name)
-            except OSError:
-                pass
-            os.rename(zip_archive, epub_full_name)
+            os.rename(zip_archive_file, epub_full_name)
             return epub_full_name
         createTOCs_and_ContentOPF()
-        epub_path = turn_zip_into_epub(create_zip_archive(epub_name))
-        return epub_path
+        return turn_zip_into_epub(create_zip_archive(epub_name))
