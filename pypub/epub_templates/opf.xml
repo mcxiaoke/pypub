@@ -8,27 +8,31 @@
     <dc:publisher>{{ publisher }}</dc:publisher>
     <dc:identifier id="book_uuid">{{ uid }}</dc:identifier>
     <dc:date>{{ date }}</dc:date>
-    <meta name="cover" content="cover_image"/>
+    <meta name="cover" content="cover"/>
   </metadata>
   <manifest>
     <item href="cover.jpg" id="cover_image" media-type="image/jpeg"/>
     <item href="main.css" id="main_css" media-type="text/css"/>
     <item href="toc.ncx" id="ncx" media-type="application/x-dtbncx+xml"/>
     <item href="toc.html" id="toc" media-type="application/xhtml+xml"/>
+    <item href="cover.xhtml" id="cover" media-type="application/xhtml+xml"/>
     {% for image in image_items %}
-    <item href="{{ image.link }}" id="{{ image.id }}" media-type="image/jpeg"/>
+    <item href="{{ image.link }}" id="{{ image.id }}" media-type="{{ image.type }}"/>
     {% endfor %}
     {% for chapter in chapters %}
     <item href="{{ chapter.link }}" id="{{ chapter.id }}" media-type="application/xhtml+xml"/>
     {% endfor %}
   </manifest>
   <spine toc="ncx">
+    <itemref idref="cover"/>
     <itemref idref="toc"/>
     {% for chapter in chapters %}
     <itemref idref="{{ chapter.id }}"/>
     {% endfor %}
   </spine>
   <guide>
-    <reference type="toc" title="Table of Contents" href="toc.html"/>
+    <!-- <reference type="toc" title="Table of Contents" href="toc.html"/> -->
+    <!-- <reference type="cover" title="Book Cover" href="cover.xhtml"/> -->
+    <reference type="text" title="First Chapter" href="chapter_0001.xhtml"/>
   </guide>
 </package>

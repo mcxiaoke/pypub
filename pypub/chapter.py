@@ -7,6 +7,7 @@ import tempfile
 import urllib
 import urlparse
 import uuid
+import mimetypes
 import traceback
 
 import bs4
@@ -20,16 +21,7 @@ import clean
 _DEFAULT_USER_AGENT = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'
 _DEFAULT_HEADERS = {'User-Agent': _DEFAULT_USER_AGENT}
 
-
-class ImageItem(object):
-    def __init__(self, link, id=None):
-        self.link  = link
-        self.name = os.path.basename(link)
-        self.id = id or self.name.rsplit('.')[0]
-        # self.link = 'images' + '/' + self.name
-
-    def __str__(self):
-        return "ImageItem{%s, %s, %s}" % (self.id, self.name, self.link)
+SUPPORTTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif']
 
 class NoUrlError(Exception):
     def __str__(self):
@@ -57,23 +49,29 @@ def is_web_url(url):
 def fix_relative_urls():
     pass
 
-def clean_html(soup):
-    for s in soup('script'):
-        s.decompose()
-    for s in soup('style'):
-        s.decompose()
-    for s in soup('a'):
-        s.decompose()
-    for s in soup('li'):
-        if not s.text.strip():
-            s.decompose()
-    for s in soup('ul'):
-        if not s.text.strip():
-            s.decompose()
-    for s in soup('p'):
-        if not s.text.strip():
-            s.decompose()
+def clean_baike_html(soup):
+    # baike fix begin
     for s in soup('span'):
+        for c in s.children:
+            if isinstance(c, bs4.element.Tag):
+                if c.name == 'p':
+                    s.replace_with_children()
+                    break
+    for s in soup(['ul', 'ol']):
+        for c in s.children:
+            if isinstance(c, bs4.element.Tag):
+                if c.name != 'li':
+                    s.decompose()
+                    break
+    # baike fix end
+
+def clean_html(soup):
+    for s in soup(['script', 'style', 'a', 'dd', 'svg', 'ul', 'ol']):
+        s.decompose()
+    for s in soup(['li', 'p', 'span']):
+        if not s.text.strip():
+            s.decompose()
+    for s in soup(['ul','ol']):
         if not s.text.strip():
             s.decompose()
     for s in soup('div'):
@@ -82,26 +80,24 @@ def clean_html(soup):
     for s in soup(True):
         del s['id']
     for s in soup('img'):
-        s['alt'] = '[IMG]'
-        s['width'] = '100%'
-        s['height'] = '100%'
+        src = s.get('src')
+        if not src or src.startswith('data:image/'):
+            s.decompose()
+        else:
+            s['alt'] = '[IMG]'
+    clean_baike_html(soup)
     return soup
 
 def get_image_type(url):
-    for ending in ['.jpg', '.jpeg', '.gif' '.png']:
-        if url.lower().endswith(ending):
-            return ending
-    else:
-        try:
-            if is_web_url(url):
-                f, temp_file_name = tempfile.mkstemp()
-                urllib.urlretrieve(url, temp_file_name)
-                return imghdr.what(temp_file_name)
-            else:
-                return imghdr.what(url)
-        except IOError:
-            return None
+    if not os.path.splitext(url)[1]:
+        return None
+    mimetype =  mimetypes.guess_type(url)[0]
+    if mimetype in SUPPORTTED_MIME_TYPES:
+        return mimetype
 
+def fix_file_name(filename):
+    valid_chars = ' _().#[]'
+    return "".join([c for c in filename if c.isalpha() or c.isdigit() or c in valid_chars]).rstrip()
 
 def save_image(image_url, image_directory, image_name):
     """
@@ -116,16 +112,17 @@ def save_image(image_url, image_directory, image_name):
     Raises:
         ImageErrorException: Raised if unable to save the image at image_url
     """
-    image_type = get_image_type(image_url)
-    if image_type is None:
+    if not get_image_type(image_url):
         raise ImageErrorException(image_url)
     full_image_file_name = os.path.join(image_directory, image_name)
 
     if is_web_url(image_url):
         try:
-            # urllib.urlretrieve(image_url, full_image_file_name)
             with open(full_image_file_name, 'wb') as f:
-                requests_object = requests.get(image_url, headers=_DEFAULT_HEADERS)
+                headers = {}
+                headers.update(_DEFAULT_HEADERS)
+                headers['Referer'] = image_url
+                requests_object = requests.get(image_url, headers=headers)
                 try:
                     content = requests_object.content
                     # Check for empty response
@@ -165,6 +162,8 @@ def _replace_image(image_url, image_tag, ebook_folder,
             image_name = os.path.basename(urlparse.urlparse(image_url).path)
         else:
             image_name = os.path.basename(image_url)
+    image_name = fix_file_name(image_name)
+    # print('_replace_image %s with %s ' % (image_url, image_name))
     try:
         image_full_path = os.path.join(ebook_folder, 'images')
         assert os.path.exists(image_full_path)
@@ -174,12 +173,25 @@ def _replace_image(image_url, image_tag, ebook_folder,
         return image_name
     except ImageErrorException:
         image_tag.decompose()
-        traceback.print_exc()
+        # traceback.print_exc()
     except AssertionError:
         raise ValueError('%s doesn\'t exist or doesn\'t contain a subdirectory images' % ebook_folder)
     except TypeError:
         image_tag.decompose()
-        traceback.print_exc()
+        # traceback.print_exc()
+
+
+
+class ImageItem(object):
+    def __init__(self, link, id=None):
+        self.link  = link
+        self.name = os.path.basename(link)
+        self.id = 'image_%s' % (id or self.name.rsplit('.')[0])
+        self.type = get_image_type(link)
+        # self.link = 'images' + '/' + self.name
+
+    def __str__(self):
+        return "ImageItem{%s, %s}" % (self.link, self.type)
 
 class Chapter(object):
     """
@@ -211,7 +223,7 @@ class Chapter(object):
         self.html_title = cgi.escape(self.title, quote=True)
         self.template_file = CHAPTER_TEMPLATE
         self.images = []
-        print('Chapter(title=%s, url=%s)' % (title, url))
+        # print('Chapter(title=%s, url=%s)' % (title, url))
 
     def _get_body(self):
         return unicode(self.soup.body.prettify())
@@ -283,8 +295,6 @@ class Chapter(object):
             root_scheme = None
         for node in node_list:
             url = node.get('src')
-            if not url:
-                continue
             if in_web_page:
                 url = urlparse.urljoin(self.url, url)
             else:
@@ -302,7 +312,7 @@ class Chapter(object):
         image_url_list = self._get_image_urls()
         for image_tag, image_url in image_url_list:
             result = _replace_image(image_url, image_tag, ebook_folder)
-            print('_replace_images_in_chapter', image_tag)
+            # print('_replace_images_in_chapter', image_tag)
         self._parse_images()
 
 class ChapterFactory(object):
@@ -343,7 +353,8 @@ class ChapterFactory(object):
         """
         # print('create_chapter_from_url', url)
         try:
-            request_object = requests.get(url, headers=self.request_headers, allow_redirects=False)
+            request_object = requests.get(url, headers=self.request_headers, allow_redirects=True)
+            request_object.encoding = 'utf-8'
         except (requests.exceptions.MissingSchema,
                 requests.exceptions.ConnectionError):
             raise ValueError("%s is an invalid url or no network connection" % url)

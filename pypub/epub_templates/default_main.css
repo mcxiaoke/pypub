@@ -34,6 +34,7 @@ html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockq
     page-break-after: always;
     padding: 0px;
     margin: 0px; }
+
     div.cover img {
       height: 100%;
       max-width: 100%;
@@ -64,32 +65,7 @@ html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockq
     page-break-inside: avoid;
     text-indent: 0px;
     text-align: left;
-    font-family: Helvetica, Arial, sans-serif; }
-  
-  h1 {
-    font-size: 1.6em;
-    margin-bottom: 3.2em; }
-  
-  .title h1 {
-    margin-bottom: 0px;
-    margin-top: 3.2em; }
-  
-  h2 {
-    font-size: 1em;
-    margin-top: 0.5em;
-    margin-bottom: 0.5em; }
-  
-  h3 {
-    font-size: 0.625em; }
-  
-  h4 {
-    font-size: 0.391em; }
-  
-  h5 {
-    font-size: 0.244em; }
-  
-  h6 {
-    font-size: 0.153em; }
+    font-family: -apple-system, Helvetica, Arial, SimHei, sans-serif; }
   
   /* Do not indent first paragraph. Mobi will need class='first-para' */
   h1 + p, h2 + p, h3 + p, h4 + p, h5 + p, h6 + p {
@@ -97,7 +73,7 @@ html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockq
   
   p {
     /* paperwhite defaults to sans */
-    font-family: "Times New Roman", Caecilia, serif;
+    font-family: Georgia, STSong, NSimSun, SimSun, STFangsong, FangSong, PMingLiU, MingLiU, serif;
     -webkit-hyphens: auto;
     -moz-hyphens: auto;
     hyphens: auto;
@@ -204,6 +180,11 @@ html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockq
     box-sizing: border-box;
     border: white 0.5em solid;
     /* Don't go too big on images, let reader zoom in if they care to */
+    margin-top: 1em;
+    margin-bottom: 1em;
+    display:block;
+    margin-left: auto; 
+    margin-right:auto;
     max-width: 80%;
     max-height: 80%; }
   
@@ -611,19 +592,6 @@ html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockq
       margin-left: 0em;
       text-indent: 0em; }
   
-    /* Sass wants to add em to the end..., hardcoded for now */
-    h1 {
-      font-size: 2em; }
-  
-    h2 {
-      font-size: 1em; }
-  
-    h3 {
-      font-size: 2em; }
-  
-    h4 {
-      font-size: 1em; }
-  
     blockquote {
       /* something in this css causes blockquotes to get doubly indented! (BUG) */
       font-style: italics;
@@ -682,3 +650,13 @@ html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockq
   /*  .color */
   /*    color: $green */
   /* */
+
+/**
+
+.font-hei {font-family: -apple-system, "Helvetica Neue", Helvetica, "Nimbus Sans L", Arial, "Liberation Sans", "PingFang SC", "Hiragino Sans GB", "Source Han Sans CN", "Source Han Sans SC", "Microsoft YaHei", "Wenquanyi Micro Hei", "WenQuanYi Zen Hei", "ST Heiti", SimHei, "WenQuanYi Zen Hei Sharp", sans-serif;}
+.font-kai {font-family: Baskerville, Georgia, "Liberation Serif", "Kaiti SC", STKaiti, "AR PL UKai CN", "AR PL UKai HK", "AR PL UKai TW", "AR PL UKai TW MBE", "AR PL KaitiM GB", KaiTi, KaiTi_GB2312, DFKai-SB, "TW\-Kai", serif;}
+.font-song {font-family: Georgia, "Nimbus Roman No9 L", "Songti SC", STSong, "AR PL New Sung", "AR PL SungtiL GB", NSimSun, SimSun, "TW\-Sung", "WenQuanYi Bitmap Song", "AR PL UMing CN", "AR PL UMing HK", "AR PL UMing TW", "AR PL UMing TW MBE", PMingLiU, MingLiU, serif;}
+.font-fang-song {font-family: Baskerville, "Times New Roman", "Liberation Serif", STFangsong, FangSong, FangSong_GB2312, "CWTEX\-F", serif;}
+
+**/
+
