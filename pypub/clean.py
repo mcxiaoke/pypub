@@ -1,11 +1,9 @@
 import re
-
 import bs4
-
 from bs4 import BeautifulSoup
 from bs4.dammit import EntitySubstitution
-
 import constants
+import deep_clean
 
 
 def create_html_from_fragment(tag):
@@ -33,7 +31,7 @@ def create_html_from_fragment(tag):
     return soup
 
 
-def clean(input_string,
+def clean(input_string, deep_clean_mode=True,
           tag_dictionary=constants.SUPPORTED_TAGS):
     """
     Sanitizes HTML. Tags not contained as keys in the tag_dictionary input are
@@ -60,6 +58,10 @@ def clean(input_string,
     except AssertionError:
         raise TypeError
     root = BeautifulSoup(input_string, 'html.parser')
+
+    if deep_clean_mode:
+        deep_clean.deep_clean(root)
+
     article_tag = root.find_all('article')
     if article_tag:
         root = article_tag[0]

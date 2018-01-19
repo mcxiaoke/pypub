@@ -46,48 +46,6 @@ def is_web_url(url):
     us = urlparse.urlparse(url)
     return us.scheme and len(us.scheme) > 2
 
-def fix_relative_urls():
-    pass
-
-def clean_baike_html(soup):
-    # baike fix begin
-    for s in soup('span'):
-        for c in s.children:
-            if isinstance(c, bs4.element.Tag):
-                if c.name == 'p':
-                    s.replace_with_children()
-                    break
-    for s in soup(['ul', 'ol']):
-        for c in s.children:
-            if isinstance(c, bs4.element.Tag):
-                if c.name != 'li':
-                    s.decompose()
-                    break
-    # baike fix end
-
-def clean_html(soup):
-    for s in soup(['script', 'style', 'a', 'dd', 'svg', 'ul', 'ol']):
-        s.decompose()
-    for s in soup(['li', 'p', 'span']):
-        if not s.text.strip():
-            s.decompose()
-    for s in soup(['ul','ol']):
-        if not s.text.strip():
-            s.decompose()
-    for s in soup('div'):
-        if not s.children:
-            s.decompose()
-    for s in soup(True):
-        del s['id']
-    for s in soup('img'):
-        src = s.get('src')
-        if not src or src.startswith('data:image/'):
-            s.decompose()
-        else:
-            s['alt'] = '[IMG]'
-    clean_baike_html(soup)
-    return soup
-
 def get_image_type(url):
     if not os.path.splitext(url)[1]:
         return None
@@ -218,11 +176,15 @@ class Chapter(object):
         self._validate_input_types(content, title)
         self.title = title
         self.soup = BeautifulSoup(content, 'html.parser')
-        clean_html(self.soup)
         self.url = url
         self.html_title = cgi.escape(self.title, quote=True)
         self.template_file = CHAPTER_TEMPLATE
         self.images = []
+        title_tag = self.soup.new_tag('h1')
+        title_tag.string = self.html_title
+        hr_tag = self.soup.new_tag('hr')
+        self.soup.body.insert(0, title_tag)
+        self.soup.body.insert(1, hr_tag)
         # print('Chapter(title=%s, url=%s)' % (title, url))
 
     def _get_body(self):
@@ -351,7 +313,7 @@ class ChapterFactory(object):
         Raises:
             ValueError: Raised if unable to connect to url supplied
         """
-        # print('create_chapter_from_url', url)
+        print('create_chapter_from_url', url)
         try:
             request_object = requests.get(url, headers=self.request_headers, allow_redirects=True)
             request_object.encoding = 'utf-8'
