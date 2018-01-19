@@ -60,3 +60,6 @@ xhtml_doctype_string = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http:
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 TEST_DIR = os.path.join(BASE_DIR, 'test_files')
 EPUB_TEMPLATES_DIR = os.path.join(BASE_DIR, 'epub_templates')
+DEFAULT_COVER = os.path.join(EPUB_TEMPLATES_DIR, 'default_cover.jpg')
+DEFAULT_CSS = os.path.join(EPUB_TEMPLATES_DIR, 'default_main.css')
+CHAPTER_TEMPLATE = os.path.join(EPUB_TEMPLATES_DIR, 'chapter.xhtml')

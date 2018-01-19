@@ -7,14 +7,29 @@ import tempfile
 import urllib
 import urlparse
 import uuid
+import traceback
 
 import bs4
 from bs4 import BeautifulSoup
 from bs4.dammit import EntitySubstitution
+import jinja2
 import requests
-
+from constants import CHAPTER_TEMPLATE
 import clean
 
+_DEFAULT_USER_AGENT = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'
+_DEFAULT_HEADERS = {'User-Agent': _DEFAULT_USER_AGENT}
+
+
+class ImageItem(object):
+    def __init__(self, link, id=None):
+        self.link  = link
+        self.name = os.path.basename(link)
+        self.id = id or self.name.rsplit('.')[0]
+        # self.link = 'images' + '/' + self.name
+
+    def __str__(self):
+        return "ImageItem{%s, %s, %s}" % (self.id, self.name, self.link)
 
 class NoUrlError(Exception):
     def __str__(self):
@@ -28,17 +43,62 @@ class ImageErrorException(Exception):
     def __str__(self):
         return 'Error downloading image from ' + self.image_url
 
+class CSSErrorException(Exception):
+    def __init__(self, css_url):
+        self.css_url = css_url
+
+    def __str__(self):
+        return 'Error downloading css from ' + self.css_url
+
+def is_web_url(url):
+    us = urlparse.urlparse(url)
+    return us.scheme and len(us.scheme) > 2
+
+def fix_relative_urls():
+    pass
+
+def clean_html(soup):
+    for s in soup('script'):
+        s.decompose()
+    for s in soup('style'):
+        s.decompose()
+    for s in soup('a'):
+        s.decompose()
+    for s in soup('li'):
+        if not s.text.strip():
+            s.decompose()
+    for s in soup('ul'):
+        if not s.text.strip():
+            s.decompose()
+    for s in soup('p'):
+        if not s.text.strip():
+            s.decompose()
+    for s in soup('span'):
+        if not s.text.strip():
+            s.decompose()
+    for s in soup('div'):
+        if not s.children:
+            s.decompose()
+    for s in soup(True):
+        del s['id']
+    for s in soup('img'):
+        s['alt'] = '[IMG]'
+        s['width'] = '100%'
+        s['height'] = '100%'
+    return soup
 
 def get_image_type(url):
-    for ending in ['jpg', 'jpeg', '.gif' '.png']:
-        if url.endswith(ending):
+    for ending in ['.jpg', '.jpeg', '.gif' '.png']:
+        if url.lower().endswith(ending):
             return ending
     else:
         try:
-            f, temp_file_name = tempfile.mkstemp()
-            urllib.urlretrieve(url, temp_file_name)
-            image_type = imghdr.what(temp_file_name)
-            return image_type
+            if is_web_url(url):
+                f, temp_file_name = tempfile.mkstemp()
+                urllib.urlretrieve(url, temp_file_name)
+                return imghdr.what(temp_file_name)
+            else:
+                return imghdr.what(url)
         except IOError:
             return None
 
@@ -59,28 +119,27 @@ def save_image(image_url, image_directory, image_name):
     image_type = get_image_type(image_url)
     if image_type is None:
         raise ImageErrorException(image_url)
-    full_image_file_name = os.path.join(image_directory, image_name + '.' + image_type)
+    full_image_file_name = os.path.join(image_directory, image_name)
 
-    # If the image is present on the local filesystem just copy it
-    if os.path.exists(image_url):
-        shutil.copy(image_url, full_image_file_name)
-        return image_type
-
-    try:
-        # urllib.urlretrieve(image_url, full_image_file_name)
-        with open(full_image_file_name, 'wb') as f:
-            user_agent = r'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0'
-            request_headers = {'User-Agent': user_agent}
-            requests_object = requests.get(image_url, headers=request_headers)
-            try:
-                content = requests_object.content
-                # Check for empty response
-                f.write(content)
-            except AttributeError:
-                raise ImageErrorException(image_url)
-    except IOError:
-        raise ImageErrorException(image_url)
-    return image_type
+    if is_web_url(image_url):
+        try:
+            # urllib.urlretrieve(image_url, full_image_file_name)
+            with open(full_image_file_name, 'wb') as f:
+                requests_object = requests.get(image_url, headers=_DEFAULT_HEADERS)
+                try:
+                    content = requests_object.content
+                    # Check for empty response
+                    f.write(content)
+                except AttributeError:
+                    raise ImageErrorException(image_url)
+        except IOError:
+            raise ImageErrorException(image_url)
+        return full_image_file_name
+    else:
+        # If the image is present on the local filesystem just copy it
+        if os.path.exists(image_url):
+            shutil.copy(image_url, full_image_file_name)
+            return full_image_file_name
 
 
 def _replace_image(image_url, image_tag, ebook_folder,
@@ -96,25 +155,31 @@ def _replace_image(image_url, image_tag, ebook_folder,
             called "images".
         image_name (Option[str]): The short name to save the image as. Should not contain a directory or an extension.
     """
+    # print('_replace_image %s in %s' % (image_url, ebook_folder))
     try:
         assert isinstance(image_tag, bs4.element.Tag)
     except AssertionError:
         raise TypeError("image_tag cannot be of type " + str(type(image_tag)))
     if image_name is None:
-        image_name = str(uuid.uuid4())
+        if is_web_url(image_url):
+            image_name = os.path.basename(urlparse.urlparse(image_url).path)
+        else:
+            image_name = os.path.basename(image_url)
     try:
         image_full_path = os.path.join(ebook_folder, 'images')
         assert os.path.exists(image_full_path)
-        image_extension = save_image(image_url, image_full_path,
+        save_image(image_url, image_full_path,
                                      image_name)
-        image_tag['src'] = 'images' + '/' + image_name + '.' + image_extension
+        image_tag['src'] = 'images' + '/' + image_name
+        return image_name
     except ImageErrorException:
         image_tag.decompose()
+        traceback.print_exc()
     except AssertionError:
         raise ValueError('%s doesn\'t exist or doesn\'t contain a subdirectory images' % ebook_folder)
     except TypeError:
         image_tag.decompose()
-
+        traceback.print_exc()
 
 class Chapter(object):
     """
@@ -140,10 +205,35 @@ class Chapter(object):
     def __init__(self, content, title, url=None):
         self._validate_input_types(content, title)
         self.title = title
-        self.content = content
-        self._content_tree = BeautifulSoup(self.content, 'html.parser')
+        self.soup = BeautifulSoup(content, 'html.parser')
+        clean_html(self.soup)
         self.url = url
         self.html_title = cgi.escape(self.title, quote=True)
+        self.template_file = CHAPTER_TEMPLATE
+        self.images = []
+        print('Chapter(title=%s, url=%s)' % (title, url))
+
+    def _get_body(self):
+        return unicode(self.soup.body.prettify())
+
+    def _render_template(self, **variable_value_pairs):
+        def read_template():
+            with codecs.open(self.template_file, 'r', 'utf-8') as f:
+                template = f.read()
+            return jinja2.Template(template)
+        template = read_template()
+        return template.render(variable_value_pairs)
+
+    def _parse_images(self):
+        images = []
+        for node in self.soup('img'):
+            image = ImageItem(node['src'])
+            images.append(image)
+            node['id'] = image.id
+        self.images = images
+
+    def get_content(self):
+        return self._render_template(title=self.title, body=self._get_body())
 
     def write(self, file_name):
         """
@@ -156,8 +246,8 @@ class Chapter(object):
             assert file_name[-6:] == '.xhtml'
         except (AssertionError, IndexError):
             raise ValueError('filename must end with .xhtml')
-        with open(file_name, 'wb') as f:
-            f.write(self.content.encode('utf-8'))
+        with codecs.open(file_name, 'w','utf-8') as f:
+            f.write(self.get_content())
 
     def _validate_input_types(self, content, title):
         try:
@@ -183,23 +273,37 @@ class Chapter(object):
         else:
             raise NoUrlError()
 
+    def _extract_urls(self, node_list):
+        final_nodes = []
+        final_urls = []
+        in_web_page = is_web_url(self.url)
+        if in_web_page:
+            root_scheme = urlparse.urlparse(self.url).scheme
+        else:
+            root_scheme = None
+        for node in node_list:
+            url = node.get('src')
+            if not url:
+                continue
+            if in_web_page:
+                url = urlparse.urljoin(self.url, url)
+            else:
+                folder = os.path.dirname(self.url)
+                url = os.path.abspath(os.path.join(folder, url))
+            final_nodes.append(node)
+            final_urls.append(url)
+        return zip(final_nodes, final_urls)
+
     def _get_image_urls(self):
-        image_nodes = self._content_tree.find_all('img')
-        raw_image_urls = [node['src'] for node in image_nodes if node.has_attr('src')]
-        full_image_urls = [urlparse.urljoin(self.url, image_url) for image_url in raw_image_urls]
-        image_nodes_filtered = [node for node in image_nodes if node.has_attr('src')]
-        return zip(image_nodes_filtered, full_image_urls)
+        node_list = self.soup('img')
+        return self._extract_urls(node_list)
 
     def _replace_images_in_chapter(self, ebook_folder):
         image_url_list = self._get_image_urls()
         for image_tag, image_url in image_url_list:
-            _replace_image(image_url, image_tag, ebook_folder)
-        unformatted_html_unicode_string = unicode(self._content_tree.prettify(encoding='utf-8',
-                                                                              formatter=EntitySubstitution.substitute_html),
-                                                  encoding='utf-8')
-        unformatted_html_unicode_string = unformatted_html_unicode_string.replace('<br>', '<br/>')
-        self.content = unformatted_html_unicode_string
-
+            result = _replace_image(image_url, image_tag, ebook_folder)
+            print('_replace_images_in_chapter', image_tag)
+        self._parse_images()
 
 class ChapterFactory(object):
     """
@@ -214,8 +318,7 @@ class ChapterFactory(object):
 
     def __init__(self, clean_function=clean.clean):
         self.clean_function = clean_function
-        user_agent = r'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0'
-        self.request_headers = {'User-Agent': user_agent}
+        self.request_headers = _DEFAULT_HEADERS
 
     def create_chapter_from_url(self, url, title=None):
         """
@@ -238,6 +341,7 @@ class ChapterFactory(object):
         Raises:
             ValueError: Raised if unable to connect to url supplied
         """
+        # print('create_chapter_from_url', url)
         try:
             request_object = requests.get(url, headers=self.request_headers, allow_redirects=False)
         except (requests.exceptions.MissingSchema,
@@ -246,9 +350,10 @@ class ChapterFactory(object):
         except requests.exceptions.SSLError:
             raise ValueError("Url %s doesn't have valid SSL certificate" % url)
         unicode_string = request_object.text
-        return self.create_chapter_from_string(unicode_string, url, title)
+        return self.create_chapter_from_string(unicode_string, title, url, True)
 
-    def create_chapter_from_file(self, file_name, url=None, title=None):
+    def create_chapter_from_file(self, file_path, title=None):
+        file_path = os.path.abspath(file_path)
         """
         Creates a Chapter object from an html or xhtml file. Sanitizes the
         file's content using the clean_function method, and saves
@@ -266,11 +371,12 @@ class ChapterFactory(object):
             Chapter: A chapter object whose content is the given file
                 and whose title is that provided or inferred from the url
         """
-        with codecs.open(file_name, 'r', encoding='utf-8') as f:
+        # print('create_chapter_from_file', file_path)
+        with codecs.open(file_path, 'r', 'utf-8') as f:
             content_string = f.read()
-        return self.create_chapter_from_string(content_string, url, title)
+        return self.create_chapter_from_string(content_string, title, file_path, False)
 
-    def create_chapter_from_string(self, html_string, url=None, title=None):
+    def create_chapter_from_string(self, html_string, title=None, url=None, clean_html=False):
         """
         Creates a Chapter object from a string. Sanitizes the
         string using the clean_function method, and saves
@@ -288,11 +394,11 @@ class ChapterFactory(object):
             Chapter: A chapter object whose content is the given string
                 and whose title is that provided or inferred from the url
         """
-        clean_html_string = self.clean_function(html_string)
+        
+        clean_html_string = self.clean_function(html_string) if clean_html else html_string
         clean_xhtml_string = clean.html_to_xhtml(clean_html_string)
-        if title:
-            pass
-        else:
+
+        if not title:
             try:
                 root = BeautifulSoup(html_string, 'html.parser')
                 title_node = root.title
@@ -302,6 +408,8 @@ class ChapterFactory(object):
                     raise ValueError
             except (IndexError, ValueError):
                 title = 'Ebook Chapter'
+        title = title.strip()
+        # print('\n\ncreate_chapter_from_string, url=%s' % url)
         return Chapter(clean_xhtml_string, title, url)
 
 create_chapter_from_url = ChapterFactory().create_chapter_from_url

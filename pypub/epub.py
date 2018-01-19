@@ -5,7 +5,8 @@ import string
 import shutil
 import tempfile
 import time
-
+import codecs
+import uuid
 import jinja2
 import requests
 import requests.packages.urllib3
@@ -24,6 +25,10 @@ import chapter
 
 requests.packages.urllib3.disable_warnings()
 
+def _get_image_type(image_path):
+    for ending in ['.jpg', '.jpeg', '.gif' '.png']:
+        if image_path.lower().endswith(ending):
+            return ending
 
 class _Mimetype(object):
 
@@ -31,7 +36,6 @@ class _Mimetype(object):
         mimetype_template = os.path.join(EPUB_TEMPLATES_DIR, 'mimetype')
         shutil.copy(mimetype_template,
                     os.path.join(parent_directory, 'mimetype'))
-
 
 class _ContainerFile(object):
 
@@ -47,12 +51,15 @@ class _EpubFile(object):
         self.content = u''
         self.file_name = ''
         self.template_file = template_file
-        self.non_chapter_parameters = non_chapter_parameters
+        self.non_chapter_parameters = non_chapter_parameters or {}
 
     def write(self, file_name):
         self.file_name = file_name
-        with open(file_name, 'wb') as f:
-            f.write(self.content.encode('utf-8'))
+        with codecs.open(file_name, 'w', 'utf-8') as f:
+            f.write(self.content)
+
+    def add_image_items(self, image_list):
+        self.non_chapter_parameters['image_items'] = image_list
 
     def _render_template(self, **variable_value_pairs):
         def read_template():
@@ -89,7 +96,7 @@ class TocHtml(_EpubFile):
 
     def add_chapters(self, chapter_list):
         chapter_numbers = range(len(chapter_list))
-        link_list = [str(n) + '.xhtml' for n in chapter_numbers]
+        link_list = ['chapter_%s.xhtml' % str(n) for n in chapter_numbers]
         try:
             for c in chapter_list:
                 t = type(c)
@@ -117,10 +124,11 @@ class TocNcx(_EpubFile):
         super(TocNcx, self).__init__(template_file, **non_chapter_parameters)
 
     def add_chapters(self, chapter_list):
-        id_list = range(len(chapter_list))
-        play_order_list = [n + 1 for n in id_list]
+        chapter_numbers = range(len(chapter_list))
+        id_list = ['chapter_%s' % str(n) for n in chapter_numbers]
+        play_order_list = [n + 1 for n in chapter_numbers]
         title_list = [c.title for c in chapter_list]
-        link_list = [str(n) + '.xhtml' for n in id_list]
+        link_list = ['chapter_%s.xhtml' % str(n) for n in chapter_numbers]
         super(TocNcx, self).add_chapters(**{'id': id_list,
                                             'play_order': play_order_list,
                                             'title': title_list,
@@ -136,7 +144,7 @@ class TocNcx(_EpubFile):
 
 class ContentOpf(_EpubFile):
 
-    def __init__(self, title, creator='', language='', rights='', publisher='', uid='', date=time.strftime("%m-%d-%Y")):
+    def __init__(self, title, creator='', language='', rights='', publisher='', uid='', date=time.strftime("%Y-%m-%d")):
         super(ContentOpf, self).__init__(os.path.join(EPUB_TEMPLATES_DIR, 'opf.xml'),
                                          title=title,
                                          creator=creator,
@@ -147,8 +155,9 @@ class ContentOpf(_EpubFile):
                                          date=date)
 
     def add_chapters(self, chapter_list):
-        id_list = range(len(chapter_list))
-        link_list = [str(n) + '.xhtml' for n in id_list]
+        chapter_numbers = range(len(chapter_list))
+        id_list = ['chapter_%s' % str(n) for n in chapter_numbers]
+        link_list = ['chapter_%s.xhtml' % str(n) for n in chapter_numbers]
         super(ContentOpf, self).add_chapters(**{'id': id_list, 'link': link_list})
 
     def get_content_as_element(self):
@@ -174,7 +183,9 @@ class Epub(object):
             is pypub.
     """
 
-    def __init__(self, title, creator='pypub', language='en', rights='', publisher='pypub', epub_dir=None):
+    def __init__(self, title, creator='pypub', language='en', rights='', 
+        publisher='pypub', cover_file=None, css_file=None,
+        uid=None, epub_dir=None):
         self._create_directories(epub_dir)
         self.chapters = []
         self.title = title
@@ -186,12 +197,15 @@ class Epub(object):
         self.language = language
         self.rights = rights
         self.publisher = publisher
-        self.uid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(12))
+        self.uid = uid or uuid.uuid4().get_hex()
         self.current_chapter_number = None
         self._increase_current_chapter_number()
+        self.cover = cover_file or DEFAULT_COVER
+        self.css = css_file or DEFAULT_CSS
         self.toc_html = TocHtml()
         self.toc_ncx = TocNcx()
-        self.opf = ContentOpf(self.title, self.creator, self.language, self.rights, self.publisher, self.uid)
+        self.opf = ContentOpf(self.title, self.creator, self.language, 
+            self.rights, self.publisher, self.uid)
         self.mimetype = _Mimetype(self.EPUB_DIR)
         self.container = _ContainerFile(self.META_INF_DIR)
 
@@ -214,7 +228,7 @@ class Epub(object):
         else:
             self.current_chapter_number += 1
         self.current_chapter_id = str(self.current_chapter_number)
-        self.current_chapter_path = ''.join([self.current_chapter_id, '.xhtml'])
+        self.current_chapter_path = 'chapter_%s.xhtml' % self.current_chapter_id
 
     def add_chapter(self, c):
         """
@@ -247,9 +261,22 @@ class Epub(object):
                 .epub at the end. If this argument is not provided, defaults to the title of the epub.
         """
         def createTOCs_and_ContentOPF():
+            image_items = []
+            for c in self.chapters:
+                for image in c.images:
+                    print(image)
+                image_items.extend(c.images)
+                
+            self.opf.add_image_items(image_items)
             for epub_file, name in ((self.toc_html, 'toc.html'), (self.toc_ncx, 'toc.ncx'), (self.opf, 'content.opf'),):
                 epub_file.add_chapters(self.chapters)
                 epub_file.write(os.path.join(self.OEBPS_DIR, name))
+
+        def copy_resources():
+            cover_output = os.path.join(self.OEBPS_DIR, 'cover.jpg')
+            shutil.copy(self.cover, cover_output)
+            css_output = os.path.join(self.OEBPS_DIR, 'main.css')
+            shutil.copy(self.css, css_output)
 
         def create_zip_archive(epub_name):
             try:
@@ -260,7 +287,6 @@ class Epub(object):
                 epub_name = self.title
             epub_name_with_path = os.path.join(output_directory, epub_name)
             epub_name_with_path_ext = os.path.join(output_directory, '%s.zip' % epub_name)
-            print('aaaa',epub_name_with_path)
             if os.path.exists(epub_name_with_path_ext):
                 os.remove(epub_name_with_path_ext)
             shutil.make_archive(epub_name_with_path, 'zip', self.EPUB_DIR)
@@ -271,11 +297,11 @@ class Epub(object):
             file_name = os.path.basename(zip_archive_file)
             base, ext = os.path.splitext(file_name)
             epub_full_name = os.path.join(dir_name, '%s.epub' % base)
-            print('bbbb',zip_archive_file)
-            print('cccc',epub_full_name)
             if os.path.exists(epub_full_name):
                 os.remove(epub_full_name)
-            os.rename(zip_archive_file, epub_full_name)
+            shutil.copy2(zip_archive_file, epub_full_name)
+            # os.rename(zip_archive_file, epub_full_name)
             return epub_full_name
         createTOCs_and_ContentOPF()
+        copy_resources()
         return turn_zip_into_epub(create_zip_archive(epub_name))
