@@ -1,4 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os
+
+INLINE_TAGS = ['span', 'small', 'big', 'strong', 'img', 'a', 'br', 'code']
 
 SUPPORTED_TAGS = {
     'a': ['href', 'id', 'name'],
@@ -25,7 +29,7 @@ SUPPORTED_TAGS = {
     'hr /': ['color', 'id', 'width'],
     'html': [],
     'i': ['class', 'id'],
-    'img': ['align', 'border', 'height', 'id', 'src', 'width'],
+    'img': ['align', 'border', 'height', 'id', 'src', 'width', 'alt'],
     'img /': ['align', 'border', 'height', 'id', 'src', 'width'],
     'li': ['class', 'id', 'title'],
     'ol': ['id'],
@@ -63,3 +67,4 @@ EPUB_TEMPLATES_DIR = os.path.join(BASE_DIR, 'epub_templates')
 DEFAULT_COVER = os.path.join(EPUB_TEMPLATES_DIR, 'default_cover.jpg')
 DEFAULT_CSS = os.path.join(EPUB_TEMPLATES_DIR, 'default_main.css')
 CHAPTER_TEMPLATE = os.path.join(EPUB_TEMPLATES_DIR, 'chapter.xhtml')
+CONTENT_TEMPLATE = os.path.join(EPUB_TEMPLATES_DIR, 'chapter.tpl')

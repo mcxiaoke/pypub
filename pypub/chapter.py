@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import cgi
 import codecs
 import imghdr
@@ -10,13 +12,15 @@ import uuid
 import mimetypes
 import traceback
 
+from six import text_type, binary_type
 import bs4
 from bs4 import BeautifulSoup
 from bs4.dammit import EntitySubstitution
 import jinja2
 import requests
-from constants import CHAPTER_TEMPLATE
+from constants import CHAPTER_TEMPLATE, CONTENT_TEMPLATE
 import clean
+import utils
 
 _DEFAULT_USER_AGENT = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'
 _DEFAULT_HEADERS = {'User-Agent': _DEFAULT_USER_AGENT}
@@ -174,25 +178,28 @@ class Chapter(object):
     """
     def __init__(self, content, title, url=None):
         self._validate_input_types(content, title)
+        self.content = content
         self.title = title
         self.soup = BeautifulSoup(content, 'html.parser')
         self.url = url
         self.html_title = cgi.escape(self.title, quote=True)
-        self.template_file = CHAPTER_TEMPLATE
         self.images = []
+        self._insert_title()
+        print('Chapter(title=%s, url=%s, type=%s)' % (title, url, type(content)))
+
+    def _insert_title(self):
         title_tag = self.soup.new_tag('h1')
         title_tag.string = self.html_title
         hr_tag = self.soup.new_tag('hr')
         self.soup.body.insert(0, title_tag)
         self.soup.body.insert(1, hr_tag)
-        # print('Chapter(title=%s, url=%s)' % (title, url))
 
     def _get_body(self):
         return unicode(self.soup.body.prettify())
 
     def _render_template(self, **variable_value_pairs):
         def read_template():
-            with codecs.open(self.template_file, 'r', 'utf-8') as f:
+            with codecs.open(CHAPTER_TEMPLATE, 'r', 'utf-8') as f:
                 template = f.read()
             return jinja2.Template(template)
         template = read_template()
@@ -313,7 +320,6 @@ class ChapterFactory(object):
         Raises:
             ValueError: Raised if unable to connect to url supplied
         """
-        print('create_chapter_from_url', url)
         try:
             request_object = requests.get(url, headers=self.request_headers, allow_redirects=True)
             request_object.encoding = 'utf-8'
@@ -326,7 +332,6 @@ class ChapterFactory(object):
         return self.create_chapter_from_string(unicode_string, title, url, True)
 
     def create_chapter_from_file(self, file_path, title=None):
-        file_path = os.path.abspath(file_path)
         """
         Creates a Chapter object from an html or xhtml file. Sanitizes the
         file's content using the clean_function method, and saves
@@ -344,19 +349,21 @@ class ChapterFactory(object):
             Chapter: A chapter object whose content is the given file
                 and whose title is that provided or inferred from the url
         """
-        # print('create_chapter_from_file', file_path)
+        file_path = os.path.abspath(file_path)
+        if not title:
+            title = os.path.splitext(os.path.basename(file_path))[0]
         with codecs.open(file_path, 'r', 'utf-8') as f:
             content_string = f.read()
         return self.create_chapter_from_string(content_string, title, file_path, False)
 
-    def create_chapter_from_string(self, html_string, title=None, url=None, clean_html=False):
+    def create_chapter_from_string(self, content, title=None, url=None, clean_html=False):
         """
-        Creates a Chapter object from a string. Sanitizes the
+        Creates a Chapter object from a html or text string. Sanitizes the
         string using the clean_function method, and saves
         it as the content of the created chapter.
 
         Args:
-            html_string (string): The html or xhtml content of the created
+            content (string): The html or xhtml content of the created
                 Chapter
             url (Option[string]): A url to infer the title of the chapter from
             title (Option[string]): The title of the created Chapter. By
@@ -367,23 +374,23 @@ class ChapterFactory(object):
             Chapter: A chapter object whose content is the given string
                 and whose title is that provided or inferred from the url
         """
+        print('create_chapter_from_string source:[%s]' % url)
+        if title:
+            if isinstance(title, binary_type):
+                title = title.decode('utf-8')
+        else:
+            title = utils.get_html_title(content)
+        if utils.is_html_file(content):
+            html_string = self.clean_function(content) if clean_html else content
+        else:
+            content = utils.strip_html_tags(content)
+            content_tpl = codecs.open(CONTENT_TEMPLATE, 'r', 'utf-8').read()
+            html_lines = ['<p>%s</p>' % line for line in content.split('\n')]
+            html_string = content_tpl % (title, '\n'.join(html_lines))
         
-        clean_html_string = self.clean_function(html_string) if clean_html else html_string
-        clean_xhtml_string = clean.html_to_xhtml(clean_html_string)
+        xhtml_string = clean.html_to_xhtml(html_string)
 
-        if not title:
-            try:
-                root = BeautifulSoup(html_string, 'html.parser')
-                title_node = root.title
-                if title_node is not None:
-                    title = unicode(title_node.string)
-                else:
-                    raise ValueError
-            except (IndexError, ValueError):
-                title = 'Ebook Chapter'
-        title = title.strip()
-        # print('\n\ncreate_chapter_from_string, url=%s' % url)
-        return Chapter(clean_xhtml_string, title, url)
+        return Chapter(xhtml_string, title, url)
 
 create_chapter_from_url = ChapterFactory().create_chapter_from_url
 create_chapter_from_file = ChapterFactory().create_chapter_from_file

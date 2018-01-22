@@ -1,7 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import re
 import bs4
 from bs4 import BeautifulSoup
 from bs4.dammit import EntitySubstitution
+from six import binary_type
 import constants
 import deep_clean
 
@@ -133,6 +136,8 @@ def html_to_xhtml(html_unicode_string):
     Raises:
         TypeError: Raised if input_string isn't a unicode string or string.
     """
+    if isinstance(html_unicode_string, binary_type):
+        html_unicode_string = html_unicode_string.decode('utf-8')
     try:
         assert isinstance(html_unicode_string, basestring)
     except AssertionError:
@@ -144,12 +149,9 @@ def html_to_xhtml(html_unicode_string):
     except AssertionError:
         raise ValueError(''.join(['html_unicode_string cannot be a fragment.',
                          'string is the following: %s', unicode(root)]))
-    # Add xmlns attribute to html node
-    root.html['xmlns'] = 'http://www.w3.org/1999/xhtml'
-    unicode_string = unicode(root.prettify(encoding='utf-8', formatter='html'), encoding='utf-8')
     # Close singleton tag_dictionary
     for tag in constants.SINGLETON_TAG_LIST:
-        unicode_string = unicode_string.replace(
+        html_unicode_string = html_unicode_string.replace(
                 '<' + tag + '/>',
                 '<' + tag + ' />')
-    return unicode_string
+    return html_unicode_string

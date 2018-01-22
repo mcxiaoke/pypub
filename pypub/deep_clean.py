@@ -1,7 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import bs4
 from bs4 import BeautifulSoup
 from bs4.dammit import EntitySubstitution
 import jinja2
+from constants import INLINE_TAGS
 
 def clean_baike_html(soup):
     # baike fix begin
@@ -35,6 +38,12 @@ def clean_some_fixes(soup):
     for s in soup('p', class_='_bq_fix'):
         del s['class']
         s.wrap(soup.new_tag('blockquote'))
+    for s in soup('p'):
+        for c in s.children:
+            if isinstance(c, bs4.element.Tag) and c.name not in INLINE_TAGS:
+                span_tag = soup.new_tag('span')
+                span_tag.string = c.string
+                c.replace_with(span_tag)
 
 def deep_clean(soup):
     for s in soup(['script', 'style', 'a', 'dd', 'svg', 'ul', 'ol', 'meta', 'noscript']):
