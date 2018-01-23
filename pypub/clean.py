@@ -4,9 +4,9 @@ import re
 import bs4
 from bs4 import BeautifulSoup
 from bs4.dammit import EntitySubstitution
-from six import binary_type
-import constants
-import deep_clean
+from six import binary_type, text_type
+from . import constants
+from . import deep_clean
 
 
 def create_html_from_fragment(tag):
@@ -139,7 +139,7 @@ def html_to_xhtml(html_unicode_string):
     if isinstance(html_unicode_string, binary_type):
         html_unicode_string = html_unicode_string.decode('utf-8')
     try:
-        assert isinstance(html_unicode_string, basestring)
+        assert isinstance(html_unicode_string, text_type)
     except AssertionError:
         raise TypeError
     root = BeautifulSoup(html_unicode_string, 'html.parser')

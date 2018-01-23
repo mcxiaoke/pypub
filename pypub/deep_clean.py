@@ -4,7 +4,7 @@ import bs4
 from bs4 import BeautifulSoup
 from bs4.dammit import EntitySubstitution
 import jinja2
-from constants import INLINE_TAGS
+from .constants import INLINE_TAGS
 
 def clean_baike_html(soup):
     # baike fix begin

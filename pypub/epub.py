@@ -12,6 +12,7 @@ import uuid
 import jinja2
 import requests
 import requests.packages.urllib3
+from six import text_type, binary_type
 
 try:
     imp.find_module('lxml')
@@ -22,8 +23,8 @@ try:
 except ImportError:
     lxml_module_exists = False
 
-from constants import *
-import chapter
+from .constants import *
+from . import chapter
 
 requests.packages.urllib3.disable_warnings()
 
@@ -60,8 +61,8 @@ class _EpubFile(object):
 
     def _render_template(self, **variable_value_pairs):
         def read_template():
-            with open(self.template_file, 'r') as f:
-                template = f.read().decode('utf-8')
+            with codecs.open(self.template_file, 'r', 'utf-8') as f:
+                template = f.read()
             return jinja2.Template(template)
         template = read_template()
         rendered_template = template.render(variable_value_pairs)
@@ -194,7 +195,7 @@ class Epub(object):
         self.language = language
         self.rights = rights
         self.publisher = publisher
-        self.uid = uid or uuid.uuid4().get_hex()
+        self.uid = uid or uuid.uuid4().hex
         self.current_chapter_number = None
         self._increase_current_chapter_number()
         self.cover = cover_file or DEFAULT_COVER
@@ -278,7 +279,7 @@ class Epub(object):
 
         def create_zip_archive(epub_name):
             try:
-                assert isinstance(epub_name, basestring) or epub_name is None
+                assert isinstance(epub_name, text_type) or epub_name is None
             except AssertionError:
                 raise TypeError('epub_name must be string or None')
             if epub_name is None:

@@ -13,6 +13,7 @@ setup(
             'beautifulsoup4',
             'jinja2',
             'requests',
+            'six',
             ],
     description= "Create epub's using python. Pypub is a python library to create epub files quickly without having to worry about the intricacies of the epub specification.",
 )

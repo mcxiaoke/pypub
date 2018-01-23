@@ -6,21 +6,25 @@ import imghdr
 import os
 import shutil
 import tempfile
-import urllib
-import urlparse
 import uuid
 import mimetypes
 import traceback
 
-from six import text_type, binary_type
+from six import text_type, binary_type, PY2
+if PY2:
+    from urlparse import urlparse, urljoin
+    from urllib import urlencode
+else:
+    from urllib.parse import urlparse, urljoin, urlencode
+
 import bs4
 from bs4 import BeautifulSoup
 from bs4.dammit import EntitySubstitution
 import jinja2
 import requests
-from constants import CHAPTER_TEMPLATE, CONTENT_TEMPLATE
-import clean
-import utils
+from .constants import CHAPTER_TEMPLATE, CONTENT_TEMPLATE
+from . import clean
+from . import utils
 
 _DEFAULT_USER_AGENT = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'
 _DEFAULT_HEADERS = {'User-Agent': _DEFAULT_USER_AGENT}
@@ -47,7 +51,7 @@ class CSSErrorException(Exception):
         return 'Error downloading css from ' + self.css_url
 
 def is_web_url(url):
-    us = urlparse.urlparse(url)
+    us = urlparse(url)
     return us.scheme and len(us.scheme) > 2
 
 def get_image_type(url):
@@ -195,7 +199,7 @@ class Chapter(object):
         self.soup.body.insert(1, hr_tag)
 
     def _get_body(self):
-        return unicode(self.soup.body.prettify())
+        return self.soup.body.prettify()
 
     def _render_template(self, **variable_value_pairs):
         def read_template():
@@ -232,11 +236,11 @@ class Chapter(object):
 
     def _validate_input_types(self, content, title):
         try:
-            assert isinstance(content, basestring)
+            assert isinstance(content, text_type)
         except AssertionError:
             raise TypeError('content must be a string')
         try:
-            assert isinstance(title, basestring)
+            assert isinstance(title, text_type)
         except AssertionError:
             raise TypeError('title must be a string')
         try:
