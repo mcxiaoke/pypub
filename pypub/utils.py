@@ -40,4 +40,18 @@ def strip_html_tags(html_string):
     text = text.replace('<','')
     text = text.replace('>','')
     text = text.replace('\uE4C6','')
-    return text
+    return strip_invalid_xml_chars(text)
+
+def _valid_xml_char_ordinal(c):
+    codepoint = ord(c)
+    # conditions ordered by presumed frequency
+    return (
+        0x20 <= codepoint <= 0xD7FF or
+        codepoint in (0x9, 0xA, 0xD) or
+        0xE000 <= codepoint <= 0xFFFD or
+        0x10000 <= codepoint <= 0x10FFFF
+        )
+
+def strip_invalid_xml_chars(html_string):
+    # https://stackoverflow.com/questions/8733233/filtering-out-certain-bytes-in-python
+    return ''.join(c for c in html_string if _valid_xml_char_ordinal(c))
