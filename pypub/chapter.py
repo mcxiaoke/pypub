@@ -189,11 +189,11 @@ class Chapter(object):
         self.html_title = cgi.escape(self.title, quote=True)
         self.images = []
         self._insert_title()
-        print('Chapter(title=%s, url=%s, type=%s)' % (title, url, type(content)))
+        # print('Chapter(title=%s, url=%s, type=%s)' % (title, url, type(content)))
 
     def _insert_title(self):
         title_tag = self.soup.new_tag('h1')
-        title_tag.string = self.html_title
+        title_tag.string = self.title
         hr_tag = self.soup.new_tag('hr')
         self.soup.body.insert(0, title_tag)
         self.soup.body.insert(1, hr_tag)
@@ -218,7 +218,7 @@ class Chapter(object):
         self.images = images
 
     def get_content(self):
-        return self._render_template(title=self.title, body=self._get_body())
+        return self._render_template(title=self.html_title, body=self._get_body())
 
     def write(self, file_name):
         """
@@ -378,7 +378,7 @@ class ChapterFactory(object):
             Chapter: A chapter object whose content is the given string
                 and whose title is that provided or inferred from the url
         """
-        print('create_chapter_from_string source:[%s]' % url)
+        # print('create_chapter_from_string source:[%s]' % url)
         if title:
             if isinstance(title, binary_type):
                 title = title.decode('utf-8')

@@ -97,12 +97,11 @@ class TocHtml(_EpubFile):
         link_list = ['chapter_%04d.xhtml' % n for n in chapter_numbers]
         try:
             for c in chapter_list:
-                t = type(c)
                 assert type(c) == chapter.Chapter
         except AssertionError:
             raise TypeError('chapter_list items must be Chapter not %s',
                             str(t))
-        chapter_titles = [c.title for c in chapter_list]
+        chapter_titles = [c.html_title for c in chapter_list]
         super(TocHtml, self).add_chapters(title=chapter_titles,
                                           link=link_list)
 
@@ -125,7 +124,7 @@ class TocNcx(_EpubFile):
         chapter_numbers = range(1,len(chapter_list)+1)
         id_list = ['chapter_%04d' % n for n in chapter_numbers]
         play_order_list = [n for n in chapter_numbers]
-        title_list = [c.title for c in chapter_list]
+        title_list = [c.html_title for c in chapter_list]
         link_list = ['chapter_%04d.xhtml' % n for n in chapter_numbers]
         super(TocNcx, self).add_chapters(**{'id': id_list,
                                             'play_order': play_order_list,
@@ -277,6 +276,13 @@ class Epub(object):
             css_output = os.path.join(self.OEBPS_DIR, 'main.css')
             shutil.copy(self.css, css_output)
 
+        def clean_emtpy_dirs():
+            for name in os.listdir(self.OEBPS_DIR):
+                f = os.path.join(self.OEBPS_DIR, name)
+                if os.path.isdir(f):
+                    if not os.listdir(f):
+                        os.rmdir(f)
+
         def create_zip_archive(epub_name):
             try:
                 assert isinstance(epub_name, text_type) or epub_name is None
@@ -288,6 +294,7 @@ class Epub(object):
             epub_name_with_path_ext = os.path.join(output_directory, '%s.zip' % epub_name)
             if os.path.exists(epub_name_with_path_ext):
                 os.remove(epub_name_with_path_ext)
+            clean_emtpy_dirs()
             shutil.make_archive(epub_name_with_path, 'zip', self.EPUB_DIR)
             return epub_name_with_path_ext
 
@@ -300,7 +307,9 @@ class Epub(object):
                 os.remove(epub_full_name)
             shutil.copy(zip_archive_file, epub_full_name)
             # os.rename(zip_archive_file, epub_full_name)
+            print('Writing epub file to %s' % epub_full_name)
             return epub_full_name
         createTOCs_and_ContentOPF()
         copy_resources()
+        print('Collecting resources in %s' % self.OEBPS_DIR)
         return turn_zip_into_epub(create_zip_archive(epub_name))

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 import os
 import sys
 import codecs
@@ -35,4 +35,9 @@ def get_html_title(html_string):
 def strip_html_tags(html_string):
     soup = BeautifulSoup(html_string, 'html5lib')
     text = soup.find_all(text=lambda text:isinstance(text, bs4.element.NavigableString))
-    return " ".join(text)
+    text = " ".join(text)
+    text = text.replace('&','')
+    text = text.replace('<','')
+    text = text.replace('>','')
+    text = text.replace('\uE4C6','')
+    return text
