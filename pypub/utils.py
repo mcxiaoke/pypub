@@ -52,7 +52,7 @@ def remove_invalid_xml_chars2(html_string):
     soup = BeautifulSoup(html_string, 'html5lib')
     text = soup.get_text()
     soup.decompose()
-    return re.sub(r'[^0\x20-\xD7FF\x9\xA\xD\xE000-\xFFFD\x10000-\x10FFFF]+','', text)
+    return re.sub(u'[^\u0020-\uD7FF\u0009\u000A\u000D\uE000-\uFFFD\u10000-\u10FFFF]','', text)
 
 def remove_invalid_xml_chars(html_string):
     soup = BeautifulSoup(html_string, 'html5lib')
