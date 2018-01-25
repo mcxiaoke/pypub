@@ -231,8 +231,14 @@ class Chapter(object):
             assert file_name[-6:] == '.xhtml'
         except (AssertionError, IndexError):
             raise ValueError('filename must end with .xhtml')
+        html_string = self.get_content()
+        utils.validate_xhtml(html_string.encode('utf-8'))
         with codecs.open(file_name, 'w','utf-8') as f:
-            f.write(self.get_content())
+            f.write(html_string)
+        # reduce memory consuming
+        self.content = self.soup.prettify()
+        self.soup.decompose()
+        self.soup = None
 
     def _validate_input_types(self, content, title):
         try:
@@ -387,12 +393,13 @@ class ChapterFactory(object):
         if utils.is_html_file(content):
             html_string = self.clean_function(content) if clean_html else content
         else:
-            content = utils.strip_html_tags(content)
-            content_tpl = codecs.open(CONTENT_TEMPLATE, 'r', 'utf-8').read()
+            content = utils.remove_invalid_xml_chars2(content)
+            with codecs.open(CONTENT_TEMPLATE, 'r', 'utf-8') as f:
+                content_tpl = f.read()
             html_lines = ['<p>%s</p>' % line for line in content.split('\n')]
             html_string = content_tpl % (title, '\n'.join(html_lines))
         
-        xhtml_string = clean.html_to_xhtml(html_string)
+        xhtml_string = clean.html_validate(html_string)
 
         return Chapter(xhtml_string, title, url)
 

@@ -91,14 +91,14 @@ def clean(input_string, deep_clean_mode=True,
     for node in image_node_list:
         if not node.has_attr('src'):
             node.extract()
-    unformatted_html_unicode_string = unicode(root.prettify(encoding='utf-8',
+    unicode_string = unicode(root.prettify(encoding='utf-8',
                                                             formatter=EntitySubstitution.substitute_html),
                                               encoding='utf-8')
     # fix <br> tags since not handled well by default by bs4
-    unformatted_html_unicode_string = unformatted_html_unicode_string.replace('<br>', '<br/>')
+    unicode_string = unicode_string.replace('<br>', '<br/>')
     # remove &nbsp; and replace with space since not handled well by certain e-readers
-    unformatted_html_unicode_string = unformatted_html_unicode_string.replace('&nbsp;', ' ')
-    return unformatted_html_unicode_string
+    unicode_string = unicode_string.replace('&nbsp;', ' ')
+    return unicode_string
 
 
 def condense(input_string):
@@ -123,7 +123,7 @@ def condense(input_string):
     return removed_trailing_whitespace
 
 
-def html_to_xhtml(html_unicode_string):
+def html_validate(html_unicode_string):
     """
     Converts html to xhtml
 

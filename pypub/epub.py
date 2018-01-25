@@ -305,11 +305,11 @@ class Epub(object):
             epub_full_name = os.path.join(dir_name, '%s.epub' % base)
             if os.path.exists(epub_full_name):
                 os.remove(epub_full_name)
-            shutil.copy(zip_archive_file, epub_full_name)
-            # os.rename(zip_archive_file, epub_full_name)
-            print('Writing epub file to %s' % epub_full_name)
+            # shutil.copy(zip_archive_file, epub_full_name)
+            os.rename(zip_archive_file, epub_full_name)
+            print('ePub file saved to %s' % epub_full_name)
             return epub_full_name
+        print('Collecting resources in %s' % self.EPUB_DIR)
         createTOCs_and_ContentOPF()
         copy_resources()
-        print('Collecting resources in %s' % self.OEBPS_DIR)
         return turn_zip_into_epub(create_zip_archive(epub_name))
